@@ -13,9 +13,10 @@ module VGA_TEXT(
 	output[6:0] HEX0,HEX1,HEX2,HEX3,HEX4,HEX5;
 	
 	//VGA
-	reg[7:0] C_R;
+	wire[7:0] C_R;
 	wire[7:0] C_B;
 	wire[7:0] C_G;
+	wire[7:0] FG_RED,FG_GREEN,FG_BLUE, BG_RED, BG_GREEN, BG_BLUE;
 	wire[9:0] X, Y;
 	output wire[7:0] VGA_R,VGA_G,VGA_B;
 	output VGA_HS, VGA_VS;
@@ -35,11 +36,15 @@ module VGA_TEXT(
 	wire[63:0] pixelLine;
 	
 	wire[12:0] addr, cursorPos;
-	wire[7:0] qChar;//current char in textPage
+	wire[7:0] qChar, cChar;//current char in textPage
 	muxN #(13) addressSwitch(cursorPos,readIdx,DISP,addr);//When displaying, read from readIdx
 	cursor(SW[9], keys[1], cursorPos);//keep track of where cursorPos whould be
+	
 	textDecode(qChar, pixelLine);//Text font
-	textPage(addr, SW[7:0], CLOCK_50, (~DISP)&keys[0], qChar);//video memory
+	textPage text(addr, SW[7:0], CLOCK_50, (~DISP)&keys[0], qChar);//character memory
+	
+	colourDecode(cChar, FG_RED, FG_GREEN, FG_BLUE, BG_RED, BG_GREEN, BG_BLUE);
+	textPage colour(addr, SW[7:0], CLOCK_50, (~DISP)&keys[2], cChar);//colour memory
 	
 	assign LEDR[7:0] = writeChar;
 	
@@ -61,17 +66,18 @@ module VGA_TEXT(
 	//END OF MEMORY AND DECODING
 	//CONTROL SIGNALS
 	
-	assign C_G = C_R;
-	assign C_B = C_R;
-	
 	addrConversion(X[9:3],Y[9:3],readIdx);//map the grid address to a linear address
 	
+	
+	wire pixelOn;
+	assign pixelOn = pixels[Y[2:0]][7-X[2:0]];
+	
+	muxN #(8) (BG_RED, FG_RED, pixelOn, C_R);
+	muxN #(8) (BG_GREEN, FG_GREEN, pixelOn, C_G);
+	muxN #(8) (BG_BLUE, FG_BLUE, pixelOn, C_B);
+	
 	always @(posedge CLOCK_50) begin
-		if(DISP) begin
-			//Because C_R is only used while DISP = 1, this doesn't need to be here
-			C_R[7] <= pixels[Y[2:0]][7-X[2:0]];
-		end
-		else begin
+		if(~DISP) begin
 			writeChar <= qChar;
 		end
 	end
@@ -120,3 +126,4 @@ module cursor(input up, clk, output reg[12:0] value);
 			value <= value - 1;
 	end
 endmodule
+
