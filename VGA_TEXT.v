@@ -38,7 +38,7 @@ module VGA_TEXT(
 	wire[12:0] addr, cursorPos;
 	wire[7:0] qChar, cChar;//current char in textPage
 	muxN #(13) addressSwitch(cursorPos,readIdx,DISP,addr);//When displaying, read from readIdx
-	cursor(SW[9], keys[1], cursorPos);//keep track of where cursorPos whould be
+	cursor(SW[9], keys[1], cursorPos);//keep track of where cursorPos would be
 	
 	textDecode(qChar, pixelLine);//Text font
 	textPage text(addr, SW[7:0], CLOCK_50, (~DISP)&keys[0], qChar);//character memory
