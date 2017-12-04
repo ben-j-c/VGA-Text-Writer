@@ -26,7 +26,7 @@ module VGA_TEXT(
 	assign VGA_CLK = VGA_CLK_internal;
 	
 	//Link the vga controller to the internal colour chanels and the external VGA connections
-	VGA(C_R, C_G, C_B,CLOCK_50, VGA_R, VGA_G, VGA_B, VGA_CLK_internal, VGA_BLANK, VGA_HS, VGA_VS, VGA_SYNC, X, Y, DISP);
+	VGA display(C_R, C_G, C_B,CLOCK_50, VGA_R, VGA_G, VGA_B, VGA_CLK_internal, VGA_BLANK, VGA_HS, VGA_VS, VGA_SYNC, X, Y, DISP);
 
 	//END OF VGA
 	//MEMORY AND DECODING
@@ -38,22 +38,22 @@ module VGA_TEXT(
 	wire[12:0] addr, cursorPos;
 	wire[7:0] qChar, cChar;//current char in textPage
 	muxN #(13) addressSwitch(cursorPos,readIdx,DISP,addr);//When displaying, read from readIdx
-	cursor(SW[9], keys[1], cursorPos);//keep track of where cursorPos would be
+	cursor myCursor(SW[9], keys[1], cursorPos);//keep track of where cursorPos would be
 	
-	textDecode(qChar, pixelLine);//Text font
+	textDecode asciiTable(qChar, pixelLine);//Text font
 	textPage text(addr, SW[7:0], CLOCK_50, (~DISP)&keys[0], qChar);//character memory
 	
-	colourDecode(cChar, FG_RED, FG_GREEN, FG_BLUE, BG_RED, BG_GREEN, BG_BLUE);
+	colourDecode vgaColour(cChar, FG_RED, FG_GREEN, FG_BLUE, BG_RED, BG_GREEN, BG_BLUE);
 	textPage colour(addr, SW[7:0], CLOCK_50, (~DISP)&keys[2], cChar);//colour memory
 	
 	assign LEDR[7:0] = writeChar;
 	
-	decoder(cursorPos[3:0], HEX0);
-	decoder(cursorPos[7:4], HEX1);
-	decoder(cursorPos[11:8], HEX2);
-	decoder({1'b0,1'b0,1'b0,cursorPos[12:12]}, HEX3);
-	decoder(0, HEX4);
-	decoder(0, HEX5);
+	decoder h0(cursorPos[3:0], HEX0);
+	decoder h1(cursorPos[7:4], HEX1);
+	decoder h2(cursorPos[11:8], HEX2);
+	decoder h3({1'b0,1'b0,1'b0,cursorPos[12:12]}, HEX3);
+	decoder h4(0, HEX4);
+	decoder h5(0, HEX5);
 	
 	assign pixels[0] = pixelLine[7:0];
 	assign pixels[1] = pixelLine[15:8];
@@ -66,17 +66,17 @@ module VGA_TEXT(
 	//END OF MEMORY AND DECODING
 	//CONTROL SIGNALS
 	
-	addrConversion(X[9:3],Y[9:3],readIdx);//map the grid address to a linear address
+	addrConversion linearMapping(X[9:3],Y[9:3],readIdx);//map the grid address to a linear address
 	
 	
 	wire pixelOn;
-	assign pixelOn = pixels[Y[2:0]][7-X[2:0]];
+	assign pixelOn = pixels[Y[2:0]][~X[2:0]];
 	
-	muxN #(8) (BG_RED, FG_RED, pixelOn, C_R);
-	muxN #(8) (BG_GREEN, FG_GREEN, pixelOn, C_G);
-	muxN #(8) (BG_BLUE, FG_BLUE, pixelOn, C_B);
+	muxN #(8) FgBgSWR(BG_RED, FG_RED, pixelOn, C_R);
+	muxN #(8) FgBgSWG(BG_GREEN, FG_GREEN, pixelOn, C_G);
+	muxN #(8) FgBgSWB(BG_BLUE, FG_BLUE, pixelOn, C_B);
 	
-	always @(posedge CLOCK_50) begin
+	always @(posedge VGA_CLK_internal) begin
 		if(~DISP) begin
 			writeChar <= qChar;
 		end

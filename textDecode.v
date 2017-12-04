@@ -14,7 +14,7 @@ module textDecode(charCode, pixelsExternal);
 	assign pixelsExternal[63:56] = pixels[7];
 	
 	always @* begin
-		case(charCode)
+		case(charCode[7:0])
 			 0: begin //null char
 				pixels[0] = 8'b00000000;
 				pixels[1] = 8'b00000000;

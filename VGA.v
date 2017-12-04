@@ -1,5 +1,5 @@
 module VGA(C_R, C_G, C_B, CLOCK_50, VGA_R, VGA_G, VGA_B, VGA_CLK, VGA_BLANK, VGA_HS, VGA_VS, VGA_SYNC, X, Y, DISP);
-	parameter V_FP = 10, V_SP = 2, V_BP = 33, V_VA = 480, H_FP = 16, H_SP = 96, H_BP = 48, H_VA = 640;// Set the width of the regions
+	parameter LEAD_X = 0, LEAD_Y = 0, V_FP = 10, V_SP = 2, V_BP = 33, V_VA = 480, H_FP = 16, H_SP = 96, H_BP = 48, H_VA = 640;// Set the width of the regions
 	
 	input CLOCK_50;
 	input[7:0] C_R, C_G, C_B;
@@ -17,11 +17,16 @@ module VGA(C_R, C_G, C_B, CLOCK_50, VGA_R, VGA_G, VGA_B, VGA_CLK, VGA_BLANK, VGA
 	reg[9:0] col, row, counterH, counterV;
 	
 	initial
-		counterV <= 45;
+		counterV <= V_FP + V_SP + V_BP - LEAD_Y;
 	
-	muxN #(10) (0,C_R, DISP, VGA_R);
-	muxN #(10) (0,C_G, DISP, VGA_G);
-	muxN #(10) (0,C_B, DISP, VGA_B);
+	initial
+		counterH <= H_FP + H_SP + H_BP - LEAD_X;
+	
+	reg BUF_HS, BUF_VS;
+	
+	muxN #(10) rsw(0,C_R, DISP, VGA_R);
+	muxN #(10) gsw(0,C_G, DISP, VGA_G);
+	muxN #(10) bsw(0,C_B, DISP, VGA_B);
 	
 	always @(posedge CLOCK_25) begin
 		counterH = counterH + 10'b1;
@@ -35,22 +40,25 @@ module VGA(C_R, C_G, C_B, CLOCK_50, VGA_R, VGA_G, VGA_B, VGA_CLK, VGA_BLANK, VGA
 		/*
 			VSync and HSync timing
 		*/
+		VGA_VS <= BUF_VS;//The sync pulses are buffered because the onboard chip does so for everything else
+		VGA_HS <= BUF_HS;
 		if(counterH <= (H_FP + H_SP) && counterH > H_FP)//HSync after FP
-			VGA_HS = 1;
+			BUF_HS <= 1;
 		else
-			VGA_HS = 0;
+			BUF_HS <= 0;
 		
 		if(counterV <= (V_FP + V_SP) && counterV > V_FP)//VSync is between the front porch and backporch
-			VGA_VS = 1;
+			BUF_VS = 1;
 		else
-			VGA_VS = 0;
+			BUF_VS = 0;
+		
 		
 		
 		//RGB timing
-		if(counterV > (V_FP + V_SP + V_BP) && counterH > (H_FP + H_SP + H_BP)) begin
+		if(counterV > (V_FP + V_SP + V_BP - LEAD_Y) && counterH > (H_FP + H_SP + H_BP - LEAD_X)) begin
 			DISP = 1;
-			X = counterH - (H_FP + H_SP + H_BP + 1);
-			Y = counterV - (V_FP + V_SP + V_BP + 1);
+			X[9:0] = counterH[9:0] + LEAD_X - (H_FP + H_SP + H_BP + 1);
+			Y[9:0] = counterV[9:0] + LEAD_Y - (V_FP + V_SP + V_BP + 1);
 		end
 		else begin
 			DISP = 0;
